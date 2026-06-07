@@ -21,7 +21,7 @@ import {
 
 // ─── Typeform URL ─────────────────────────────────────────────────────────────
 // Replace with the actual Typeform brand rating survey URL when ready.
-const BRAND_REVIEW_TYPEFORM_URL = "https://form.typeform.com/to/YOUR_FORM_ID";
+const BRAND_REVIEW_TYPEFORM_URL = "https://form.typeform.com/to/RmpNNLAU";
 
 // ─── Form schema ──────────────────────────────────────────────────────────────
 
@@ -164,31 +164,42 @@ function CopyButton({ result }: { result: ScamResult }) {
 
 function BrandLookupPrompt() {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-3 shadow-sm">
+    <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-5 space-y-4 shadow-sm">
       <div className="flex items-start gap-3">
         <div className="mt-0.5 flex-shrink-0 w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
           <ShieldCheck className="w-4 h-4 text-indigo-600" />
         </div>
         <div className="space-y-1">
           <p className="font-semibold text-gray-900 text-sm">
-            Want to see what other creators have reported about this brand?
+            Want to see if we have more info on this brand?
           </p>
           <p className="text-sm text-gray-600 leading-relaxed">
-            Submit one quick brand review to unlock{" "}
-            <span className="font-medium text-indigo-700">Brand Lookup</span> for
-            15 days — see verified creator reports on brands before you reply.
+            The <span className="font-medium text-indigo-700">CreatorGrove Brand Ratings</span> database
+            has verified creator reports on brands — payment history, communication, red flags, and more.
+            See a preview of what's inside, then submit a quick brand review to unlock full access for 15 days.
           </p>
         </div>
       </div>
-      <a
-        href={BRAND_REVIEW_TYPEFORM_URL}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
-      >
-        Submit a brand review to unlock Brand Lookup
-        <ExternalLink className="w-3.5 h-3.5" />
-      </a>
+      <div className="flex flex-col sm:flex-row gap-3">
+        <a
+          href="https://www.creatorgrove.com/brandratings"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+        >
+          See Brand Ratings
+          <ExternalLink className="w-3.5 h-3.5" />
+        </a>
+        <a
+          href={BRAND_REVIEW_TYPEFORM_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center justify-center gap-1.5 text-sm font-medium text-indigo-700 border border-indigo-300 bg-white px-4 py-2 rounded-lg hover:bg-indigo-50 transition-colors"
+        >
+          Submit a brand review to unlock access
+          <ExternalLink className="w-3.5 h-3.5" />
+        </a>
+      </div>
     </div>
   );
 }
