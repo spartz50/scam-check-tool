@@ -25,4 +25,16 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+/**
+ * Anonymized scam check usage log.
+ * Stores ONLY the outcome (risk_level) and the time of the check.
+ * No message text, brand name, sender info, or any user-entered content is stored.
+ */
+export const scamCheckLogs = mysqlTable("scam_check_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  riskLevel: mysqlEnum("riskLevel", ["HIGH RISK", "CAUTION", "LOW RISK SIGNALS"]).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ScamCheckLog = typeof scamCheckLogs.$inferSelect;
+export type InsertScamCheckLog = typeof scamCheckLogs.$inferInsert;

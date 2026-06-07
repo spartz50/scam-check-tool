@@ -8,6 +8,13 @@
       "when": 1780847369362,
       "tag": "0000_free_rumiko_fujikawa",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1780850668878,
+      "tag": "0001_great_carmella_unuscione",
+      "breakpoints": true
     }
   ]
 }

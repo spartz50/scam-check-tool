@@ -14,7 +14,14 @@ import {
   Loader2,
   ChevronDown,
   ChevronUp,
+  Copy,
+  Check,
+  ExternalLink,
 } from "lucide-react";
+
+// ─── Typeform URL ─────────────────────────────────────────────────────────────
+// Replace with the actual Typeform brand rating survey URL when ready.
+const BRAND_REVIEW_TYPEFORM_URL = "https://form.typeform.com/to/YOUR_FORM_ID";
 
 // ─── Form schema ──────────────────────────────────────────────────────────────
 
@@ -80,6 +87,112 @@ const riskConfig: Record<
   },
 };
 
+// ─── Copy-to-clipboard helper ─────────────────────────────────────────────────
+
+function buildCopyText(result: ScamResult): string {
+  const lines: string[] = [
+    `SCAM CHECK RESULT — Creator Grove`,
+    ``,
+    `Risk Level: ${result.risk_level}`,
+    `Risk Score: ${result.risk_score}/100`,
+    ``,
+    `Summary:`,
+    result.summary,
+  ];
+
+  if (result.flags.length > 0) {
+    lines.push(``);
+    lines.push(`Signals detected (${result.flags.length}):`);
+    for (const flag of result.flags) {
+      lines.push(`• ${flag.label}: ${flag.explanation}`);
+    }
+  }
+
+  lines.push(``);
+  lines.push(
+    `Pattern/AI matching is decision support only and cannot guarantee whether an opportunity is safe. Always verify the brand independently before sending content, personal information, or money.`
+  );
+
+  return lines.join("\n");
+}
+
+// ─── Copy button ──────────────────────────────────────────────────────────────
+
+function CopyButton({ result }: { result: ScamResult }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(buildCopyText(result));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback for browsers that block clipboard without HTTPS
+      const el = document.createElement("textarea");
+      el.value = buildCopyText(result);
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 transition-colors px-2 py-1 rounded-md hover:bg-white/60"
+    >
+      {copied ? (
+        <>
+          <Check className="w-3.5 h-3.5 text-emerald-600" />
+          <span className="text-emerald-600">Copied</span>
+        </>
+      ) : (
+        <>
+          <Copy className="w-3.5 h-3.5" />
+          Copy result
+        </>
+      )}
+    </button>
+  );
+}
+
+// ─── Brand Lookup unlock prompt ───────────────────────────────────────────────
+
+function BrandLookupPrompt() {
+  return (
+    <div className="rounded-xl border border-gray-200 bg-white p-5 space-y-3 shadow-sm">
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 flex-shrink-0 w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+          <ShieldCheck className="w-4 h-4 text-indigo-600" />
+        </div>
+        <div className="space-y-1">
+          <p className="font-semibold text-gray-900 text-sm">
+            Want to see what other creators have reported about this brand?
+          </p>
+          <p className="text-sm text-gray-600 leading-relaxed">
+            Submit one quick brand review to unlock{" "}
+            <span className="font-medium text-indigo-700">Brand Lookup</span> for
+            15 days — see verified creator reports on brands before you reply.
+          </p>
+        </div>
+      </div>
+      <a
+        href={BRAND_REVIEW_TYPEFORM_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-800 transition-colors"
+      >
+        Submit a brand review to unlock Brand Lookup
+        <ExternalLink className="w-3.5 h-3.5" />
+      </a>
+    </div>
+  );
+}
+
 // ─── Result card ──────────────────────────────────────────────────────────────
 
 function ResultCard({ result }: { result: ScamResult }) {
@@ -87,76 +200,84 @@ function ResultCard({ result }: { result: ScamResult }) {
   const [flagsOpen, setFlagsOpen] = useState(true);
 
   return (
-    <div
-      className={`rounded-xl border-2 ${cfg.border} ${cfg.bg} p-6 space-y-5 shadow-sm`}
-    >
-      {/* Header row */}
-      <div className="flex items-center gap-3">
-        {cfg.icon}
-        <span
-          className={`text-sm font-bold tracking-wide uppercase px-3 py-1 rounded-full ${cfg.badge} ${cfg.badgeText}`}
-        >
-          {result.risk_level}
-        </span>
-        <span className="ml-auto text-sm font-semibold text-gray-600">
-          Risk score: {result.risk_score}/100
-        </span>
-      </div>
-
-      {/* Score bar */}
-      <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
-        <div
-          className={`h-2.5 rounded-full transition-all duration-500 ${cfg.scoreBar}`}
-          style={{ width: `${Math.min(100, Math.max(0, result.risk_score))}%` }}
-        />
-      </div>
-
-      {/* Summary */}
-      <p className="text-gray-800 text-sm leading-relaxed">{result.summary}</p>
-
-      {/* Flags */}
-      {result.flags.length > 0 && (
-        <div>
-          <button
-            type="button"
-            onClick={() => setFlagsOpen(o => !o)}
-            className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-700 transition-colors"
+    <div className="space-y-4">
+      <div
+        className={`rounded-xl border-2 ${cfg.border} ${cfg.bg} p-6 space-y-5 shadow-sm`}
+      >
+        {/* Header row */}
+        <div className="flex items-center gap-3 flex-wrap">
+          {cfg.icon}
+          <span
+            className={`text-sm font-bold tracking-wide uppercase px-3 py-1 rounded-full ${cfg.badge} ${cfg.badgeText}`}
           >
-            {flagsOpen ? (
-              <ChevronUp className="w-3.5 h-3.5" />
-            ) : (
-              <ChevronDown className="w-3.5 h-3.5" />
-            )}
-            {result.flags.length} signal{result.flags.length !== 1 ? "s" : ""} detected
-          </button>
-
-          {flagsOpen && (
-            <ul className="mt-3 space-y-2">
-              {result.flags.map((flag, i) => (
-                <li
-                  key={i}
-                  className="flex gap-2.5 bg-white/70 rounded-lg px-4 py-3 border border-gray-100"
-                >
-                  <span className="mt-0.5 w-2 h-2 rounded-full bg-gray-400 flex-shrink-0 mt-1.5" />
-                  <div>
-                    <span className="font-semibold text-gray-800 text-sm">
-                      {flag.label}
-                    </span>
-                    <span className="text-gray-600 text-sm"> — {flag.explanation}</span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
+            {result.risk_level}
+          </span>
+          <span className="text-sm font-semibold text-gray-600">
+            Risk score: {result.risk_score}/100
+          </span>
+          <div className="ml-auto">
+            <CopyButton result={result} />
+          </div>
         </div>
-      )}
 
-      {/* Disclaimer */}
-      <p className="text-xs text-gray-400 border-t border-gray-200 pt-4">
-        Pattern/AI matching is decision support only and cannot guarantee whether
-        an opportunity is safe. Always verify the brand independently before
-        sending content, personal information, or money.
-      </p>
+        {/* Score bar */}
+        <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+          <div
+            className={`h-2.5 rounded-full transition-all duration-500 ${cfg.scoreBar}`}
+            style={{ width: `${Math.min(100, Math.max(0, result.risk_score))}%` }}
+          />
+        </div>
+
+        {/* Summary */}
+        <p className="text-gray-800 text-sm leading-relaxed">{result.summary}</p>
+
+        {/* Flags */}
+        {result.flags.length > 0 && (
+          <div>
+            <button
+              type="button"
+              onClick={() => setFlagsOpen(o => !o)}
+              className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-700 transition-colors"
+            >
+              {flagsOpen ? (
+                <ChevronUp className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5" />
+              )}
+              {result.flags.length} signal{result.flags.length !== 1 ? "s" : ""} detected
+            </button>
+
+            {flagsOpen && (
+              <ul className="mt-3 space-y-2">
+                {result.flags.map((flag, i) => (
+                  <li
+                    key={i}
+                    className="flex gap-2.5 bg-white/70 rounded-lg px-4 py-3 border border-gray-100"
+                  >
+                    <span className="w-2 h-2 rounded-full bg-gray-400 flex-shrink-0 mt-1.5" />
+                    <div>
+                      <span className="font-semibold text-gray-800 text-sm">
+                        {flag.label}
+                      </span>
+                      <span className="text-gray-600 text-sm"> — {flag.explanation}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {/* Disclaimer */}
+        <p className="text-xs text-gray-400 border-t border-gray-200 pt-4">
+          Pattern/AI matching is decision support only and cannot guarantee whether
+          an opportunity is safe. Always verify the brand independently before
+          sending content, personal information, or money.
+        </p>
+      </div>
+
+      {/* Brand Lookup unlock prompt — shown below every result */}
+      <BrandLookupPrompt />
     </div>
   );
 }
@@ -301,7 +422,7 @@ export default function ScamDetector() {
           </div>
         )}
 
-        {/* Result */}
+        {/* Result + Brand Lookup prompt */}
         {result && <ResultCard result={result} />}
       </main>
     </div>

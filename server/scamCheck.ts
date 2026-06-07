@@ -8,11 +8,19 @@
  *
  * Rate limit: RATE_LIMIT_MAX checks per RATE_LIMIT_WINDOW_MS per IP.
  * Stored in-process; resets on server restart (sufficient for this use case).
+ *
+ * Logging: after each successful check, ONE row is written to scam_check_logs:
+ *   - riskLevel  (the outcome enum value)
+ *   - createdAt  (auto-set by the DB to NOW())
+ * NO message text, brand name, sender info, or any user-entered content is
+ * stored anywhere in the database or in server logs.
  */
 
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { publicProcedure, router } from "./_core/trpc";
+import { getDb } from "./db";
+import { scamCheckLogs } from "../drizzle/schema";
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -48,6 +56,23 @@ function checkRateLimit(ip: string): void {
   }
 
   entry.count += 1;
+}
+
+// ─── Anonymized usage logger ──────────────────────────────────────────────────
+// Writes ONLY the risk_level enum value and the auto-generated timestamp.
+// No user content, no IP, no message text is written.
+
+async function logCheckOutcome(
+  riskLevel: "HIGH RISK" | "CAUTION" | "LOW RISK SIGNALS"
+): Promise<void> {
+  try {
+    const db = await getDb();
+    if (!db) return; // DB unavailable — log silently, don't fail the request
+    await db.insert(scamCheckLogs).values({ riskLevel });
+  } catch (err) {
+    // Logging failure must never surface to the user
+    console.error("[scamCheck] Failed to write usage log:", err);
+  }
 }
 
 // ─── System prompt ────────────────────────────────────────────────────────────
@@ -157,7 +182,6 @@ async function callHaiku(userMessage: string): Promise<ScamCheckResult> {
     .replace(/\s*```[\s\S]*$/, "")
     .trim();
 
-  // Find the outermost JSON object
   const jsonMatch = fenceStripped.match(/\{[\s\S]*\}/);
   const cleaned = jsonMatch ? jsonMatch[0] : fenceStripped;
 
@@ -214,7 +238,9 @@ export const scamCheckRouter = router({
 
       checkRateLimit(ip);
 
-      // Build the user message for the model
+      // Build the user message for the model.
+      // NOTE: this string is sent to the Anthropic API only — it is never
+      // written to the database or to any persistent log.
       const parts: string[] = [`MESSAGE:\n${input.message}`];
       if (input.brandName?.trim()) parts.push(`BRAND/SENDER NAME: ${input.brandName.trim()}`);
       if (input.senderEmail?.trim()) parts.push(`SENDER EMAIL/DOMAIN: ${input.senderEmail.trim()}`);
@@ -223,6 +249,11 @@ export const scamCheckRouter = router({
       const userMessage = parts.join("\n\n");
 
       const result = await callHaiku(userMessage);
+
+      // Log ONLY the outcome — no user content is persisted.
+      // Fire-and-forget: logging failure never blocks the response.
+      void logCheckOutcome(result.risk_level);
+
       return result;
     }),
 });
