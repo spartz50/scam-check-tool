@@ -3,10 +3,6 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { trpc } from "@/lib/trpc";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   AlertTriangle,
   ShieldAlert,
@@ -17,13 +13,11 @@ import {
   Copy,
   Check,
   ExternalLink,
+  ArrowLeft,
 } from "lucide-react";
+import { Link } from "wouter";
 
-// ─── Typeform URL ─────────────────────────────────────────────────────────────
-// Replace with the actual Typeform brand rating survey URL when ready.
 const BRAND_REVIEW_TYPEFORM_URL = "https://form.typeform.com/to/RmpNNLAU";
-
-// ─── Form schema ──────────────────────────────────────────────────────────────
 
 const formSchema = z.object({
   message: z
@@ -37,8 +31,6 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 type RiskLevel = "HIGH RISK" | "CAUTION" | "LOW RISK SIGNALS";
 
 type ScamResult = {
@@ -47,8 +39,6 @@ type ScamResult = {
   summary: string;
   flags: Array<{ label: string; explanation: string }>;
 };
-
-// ─── Risk level styling ───────────────────────────────────────────────────────
 
 const riskConfig: Record<
   RiskLevel,
@@ -59,39 +49,41 @@ const riskConfig: Record<
     badgeText: string;
     icon: React.ReactNode;
     scoreBar: string;
+    glow: string;
   }
 > = {
   "HIGH RISK": {
-    border: "border-red-500",
-    bg: "bg-red-50",
+    border: "border-red-500/50",
+    bg: "bg-red-950/30",
     badge: "bg-red-600",
     badgeText: "text-white",
-    icon: <ShieldAlert className="w-6 h-6 text-red-600" />,
+    icon: <ShieldAlert className="w-5 h-5 text-red-400" />,
     scoreBar: "bg-red-500",
+    glow: "shadow-red-500/20",
   },
   CAUTION: {
-    border: "border-amber-400",
-    bg: "bg-amber-50",
+    border: "border-amber-400/50",
+    bg: "bg-amber-950/20",
     badge: "bg-amber-400",
     badgeText: "text-amber-900",
-    icon: <AlertTriangle className="w-6 h-6 text-amber-500" />,
+    icon: <AlertTriangle className="w-5 h-5 text-amber-400" />,
     scoreBar: "bg-amber-400",
+    glow: "shadow-amber-400/20",
   },
   "LOW RISK SIGNALS": {
-    border: "border-emerald-400",
-    bg: "bg-emerald-50",
+    border: "border-emerald-400/50",
+    bg: "bg-emerald-950/20",
     badge: "bg-emerald-500",
     badgeText: "text-white",
-    icon: <ShieldCheck className="w-6 h-6 text-emerald-600" />,
+    icon: <ShieldCheck className="w-5 h-5 text-emerald-400" />,
     scoreBar: "bg-emerald-500",
+    glow: "shadow-emerald-400/20",
   },
 };
 
-// ─── Copy-to-clipboard helper ─────────────────────────────────────────────────
-
 function buildCopyText(result: ScamResult): string {
   const lines: string[] = [
-    `SCAM CHECK RESULT — Creator Grove`,
+    `SCAM CHECK RESULT — CreatorGrove`,
     ``,
     `Risk Level: ${result.risk_level}`,
     `Risk Score: ${result.risk_score}/100`,
@@ -99,7 +91,6 @@ function buildCopyText(result: ScamResult): string {
     `Summary:`,
     result.summary,
   ];
-
   if (result.flags.length > 0) {
     lines.push(``);
     lines.push(`Signals detected (${result.flags.length}):`);
@@ -107,48 +98,45 @@ function buildCopyText(result: ScamResult): string {
       lines.push(`• ${flag.label}: ${flag.explanation}`);
     }
   }
-
   lines.push(``);
   lines.push(
-    `Pattern/AI matching is decision support only and cannot guarantee whether an opportunity is safe. Always verify the brand independently before sending content, personal information, or money.`
+    `AI matching is decision support only. Always verify the brand independently before sending content, personal information, or money.`
   );
-
   return lines.join("\n");
 }
 
-// ─── Copy button ──────────────────────────────────────────────────────────────
-
 function CopyButton({ result }: { result: ScamResult }) {
   const [copied, setCopied] = useState(false);
-
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(buildCopyText(result));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
     } catch {
-      // Fallback for browsers that block clipboard without HTTPS
       const el = document.createElement("textarea");
       el.value = buildCopyText(result);
       document.body.appendChild(el);
       el.select();
       document.execCommand("copy");
       document.body.removeChild(el);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
     }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
-
   return (
     <button
       type="button"
       onClick={handleCopy}
-      className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 transition-colors px-2 py-1 rounded-md hover:bg-white/60"
+      className="flex items-center gap-1.5 text-xs font-medium transition-colors px-2.5 py-1.5 rounded-lg"
+      style={{
+        color: copied ? "#34D399" : "#94A3B8",
+        background: "rgba(255,255,255,0.06)",
+        border: "1px solid rgba(255,255,255,0.1)",
+        fontFamily: "'Inter', sans-serif",
+      }}
     >
       {copied ? (
         <>
-          <Check className="w-3.5 h-3.5 text-emerald-600" />
-          <span className="text-emerald-600">Copied</span>
+          <Check className="w-3.5 h-3.5" />
+          Copied
         </>
       ) : (
         <>
@@ -160,23 +148,37 @@ function CopyButton({ result }: { result: ScamResult }) {
   );
 }
 
-// ─── Brand Lookup unlock prompt ───────────────────────────────────────────────
-
 function BrandLookupPrompt() {
   return (
-    <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-5 space-y-4 shadow-sm">
+    <div
+      className="rounded-2xl p-5 space-y-4"
+      style={{
+        background: "rgba(41,182,246,0.07)",
+        border: "1px solid rgba(41,182,246,0.28)",
+      }}
+    >
       <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex-shrink-0 w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
-          <ShieldCheck className="w-4 h-4 text-indigo-600" />
+        <div
+          className="mt-0.5 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+          style={{ background: "rgba(41,182,246,0.16)" }}
+        >
+          <ShieldCheck className="w-4 h-4 text-[#29B6F6]" />
         </div>
         <div className="space-y-1">
-          <p className="font-semibold text-gray-900 text-sm">
+          <p
+            className="font-semibold text-white text-sm"
+            style={{ fontFamily: "'Sora', sans-serif" }}
+          >
             Want to see if we have more info on this brand?
           </p>
-          <p className="text-sm text-gray-600 leading-relaxed">
-            The <span className="font-medium text-indigo-700">CreatorGrove Brand Ratings</span> database
-            has verified creator reports on brands — payment history, communication, red flags, and more.
-            See a preview of what's inside, then submit a quick brand review to unlock full access for 15 days.
+          <p className="text-sm leading-relaxed" style={{ color: "#94A3B8" }}>
+            The{" "}
+            <span style={{ color: "#29B6F6", fontWeight: 600 }}>
+              CreatorGrove Brand Ratings
+            </span>{" "}
+            database has verified creator reports on brands — payment history,
+            communication, red flags, and more. Submit a quick brand review to
+            unlock full access for 15 days.
           </p>
         </div>
       </div>
@@ -185,7 +187,12 @@ function BrandLookupPrompt() {
           href="https://www.creatorgrove.com/brandratings"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center justify-center gap-1.5 text-sm font-semibold bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors"
+          className="inline-flex items-center justify-center gap-1.5 text-sm font-bold text-white px-4 py-2.5 rounded-xl transition-all"
+          style={{
+            fontFamily: "'Sora', sans-serif",
+            background: "linear-gradient(135deg, #29B6F6 0%, #1565C0 100%)",
+            boxShadow: "0 4px 20px rgba(41,182,246,0.3)",
+          }}
         >
           See Brand Ratings
           <ExternalLink className="w-3.5 h-3.5" />
@@ -194,17 +201,21 @@ function BrandLookupPrompt() {
           href={BRAND_REVIEW_TYPEFORM_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center justify-center gap-1.5 text-sm font-medium text-indigo-700 border border-indigo-300 bg-white px-4 py-2 rounded-lg hover:bg-indigo-50 transition-colors"
+          className="inline-flex items-center justify-center gap-1.5 text-sm font-medium px-4 py-2.5 rounded-xl transition-all"
+          style={{
+            fontFamily: "'Inter', sans-serif",
+            color: "#7DD3FC",
+            border: "1px solid rgba(41,182,246,0.3)",
+            background: "rgba(41,182,246,0.06)",
+          }}
         >
-          Submit a brand review to unlock access
+          Submit a review to unlock access
           <ExternalLink className="w-3.5 h-3.5" />
         </a>
       </div>
     </div>
   );
 }
-
-// ─── Result card ──────────────────────────────────────────────────────────────
 
 function ResultCard({ result }: { result: ScamResult }) {
   const cfg = riskConfig[result.risk_level];
@@ -213,17 +224,18 @@ function ResultCard({ result }: { result: ScamResult }) {
   return (
     <div className="space-y-4">
       <div
-        className={`rounded-xl border-2 ${cfg.border} ${cfg.bg} p-6 space-y-5 shadow-sm`}
+        className={`rounded-2xl border ${cfg.border} ${cfg.bg} p-6 space-y-5 shadow-xl ${cfg.glow}`}
       >
-        {/* Header row */}
+        {/* Header */}
         <div className="flex items-center gap-3 flex-wrap">
           {cfg.icon}
           <span
-            className={`text-sm font-bold tracking-wide uppercase px-3 py-1 rounded-full ${cfg.badge} ${cfg.badgeText}`}
+            className={`text-xs font-bold tracking-widest uppercase px-3 py-1 rounded-full ${cfg.badge} ${cfg.badgeText}`}
+            style={{ fontFamily: "'Sora', sans-serif" }}
           >
             {result.risk_level}
           </span>
-          <span className="text-sm font-semibold text-gray-600">
+          <span className="text-sm font-semibold" style={{ color: "#94A3B8" }}>
             Risk score: {result.risk_score}/100
           </span>
           <div className="ml-auto">
@@ -232,23 +244,32 @@ function ResultCard({ result }: { result: ScamResult }) {
         </div>
 
         {/* Score bar */}
-        <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+        <div
+          className="w-full rounded-full h-2 overflow-hidden"
+          style={{ background: "rgba(255,255,255,0.1)" }}
+        >
           <div
-            className={`h-2.5 rounded-full transition-all duration-500 ${cfg.scoreBar}`}
+            className={`h-2 rounded-full transition-all duration-700 ${cfg.scoreBar}`}
             style={{ width: `${Math.min(100, Math.max(0, result.risk_score))}%` }}
           />
         </div>
 
         {/* Summary */}
-        <p className="text-gray-800 text-sm leading-relaxed">{result.summary}</p>
+        <p className="text-sm leading-relaxed" style={{ color: "#E2E8F0" }}>
+          {result.summary}
+        </p>
 
         {/* Flags */}
         {result.flags.length > 0 && (
           <div>
             <button
               type="button"
-              onClick={() => setFlagsOpen(o => !o)}
-              className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-700 transition-colors"
+              onClick={() => setFlagsOpen((o) => !o)}
+              className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-widest transition-colors"
+              style={{
+                color: flagsOpen ? "#29B6F6" : "#94A3B8",
+                fontFamily: "'Sora', sans-serif",
+              }}
             >
               {flagsOpen ? (
                 <ChevronUp className="w-3.5 h-3.5" />
@@ -263,14 +284,26 @@ function ResultCard({ result }: { result: ScamResult }) {
                 {result.flags.map((flag, i) => (
                   <li
                     key={i}
-                    className="flex gap-2.5 bg-white/70 rounded-lg px-4 py-3 border border-gray-100"
+                    className="flex gap-2.5 rounded-xl px-4 py-3"
+                    style={{
+                      background: "rgba(255,255,255,0.05)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                    }}
                   >
-                    <span className="w-2 h-2 rounded-full bg-gray-400 flex-shrink-0 mt-1.5" />
+                    <span
+                      className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1.5"
+                      style={{ background: "#29B6F6" }}
+                    />
                     <div>
-                      <span className="font-semibold text-gray-800 text-sm">
+                      <span
+                        className="font-semibold text-sm text-white"
+                        style={{ fontFamily: "'Sora', sans-serif" }}
+                      >
                         {flag.label}
                       </span>
-                      <span className="text-gray-600 text-sm"> — {flag.explanation}</span>
+                      <span className="text-sm" style={{ color: "#94A3B8" }}>
+                        {" "}— {flag.explanation}
+                      </span>
                     </div>
                   </li>
                 ))}
@@ -280,20 +313,23 @@ function ResultCard({ result }: { result: ScamResult }) {
         )}
 
         {/* Disclaimer */}
-        <p className="text-xs text-gray-400 border-t border-gray-200 pt-4">
-          Pattern/AI matching is decision support only and cannot guarantee whether
-          an opportunity is safe. Always verify the brand independently before
+        <p
+          className="text-xs pt-4"
+          style={{
+            color: "#64748B",
+            borderTop: "1px solid rgba(255,255,255,0.08)",
+          }}
+        >
+          AI matching is decision support only and cannot guarantee whether an
+          opportunity is safe. Always verify the brand independently before
           sending content, personal information, or money.
         </p>
       </div>
 
-      {/* Brand Lookup unlock prompt — shown below every result */}
       <BrandLookupPrompt />
     </div>
   );
 }
-
-// ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function ScamDetector() {
   const [result, setResult] = useState<ScamResult | null>(null);
@@ -314,8 +350,7 @@ export default function ScamDetector() {
     },
     onError(err) {
       setApiError(
-        err.message ||
-          "Something went wrong. Please try again in a moment."
+        err.message || "Something went wrong. Please try again in a moment."
       );
       setResult(null);
     },
@@ -328,114 +363,243 @@ export default function ScamDetector() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Page header */}
-      <header className="bg-white border-b border-gray-200 px-4 py-5">
-        <div className="max-w-2xl mx-auto">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Creator Scam Detector
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Paste a brand outreach or deal message below to check it for scam
-            signals. Optional fields add context but are never required.
-          </p>
+    <div
+      className="min-h-screen"
+      style={{
+        fontFamily: "'Inter', sans-serif",
+        background: "linear-gradient(160deg, #0D1B2A 0%, #0f2744 55%, #1a3a6b 100%)",
+        color: "#fff",
+      }}
+    >
+      {/* Background glow */}
+      <div
+        className="fixed inset-0 pointer-events-none"
+        style={{
+          backgroundImage:
+            "radial-gradient(circle at 20% 50%, rgba(41,182,246,0.05) 0%, transparent 50%)",
+        }}
+      />
+
+      {/* ── Navbar ── */}
+      <nav className="relative z-10 flex items-center justify-between px-6 py-5 max-w-3xl mx-auto">
+        <Link href="/">
+          <a className="flex items-center gap-2 text-sm font-medium transition-colors"
+            style={{ color: "#94A3B8", fontFamily: "'Inter', sans-serif" }}>
+            <ArrowLeft className="w-4 h-4" />
+            CreatorGrove
+          </a>
+        </Link>
+        <div className="flex items-center gap-2">
+          <svg width="22" height="22" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="28" height="28" rx="7" fill="url(#cg-grad-det)" />
+            <path d="M14 6L20 10V18L14 22L8 18V10L14 6Z" stroke="white" strokeWidth="1.5" strokeLinejoin="round" fill="none"/>
+            <circle cx="14" cy="14" r="2.5" fill="white"/>
+            <defs>
+              <linearGradient id="cg-grad-det" x1="0" y1="0" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#29B6F6"/>
+                <stop offset="1" stopColor="#1565C0"/>
+              </linearGradient>
+            </defs>
+          </svg>
+          <span style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: "0.9375rem" }}>
+            CreatorGrove
+          </span>
         </div>
+      </nav>
+
+      {/* ── Page header ── */}
+      <header className="relative z-10 max-w-3xl mx-auto px-6 pt-4 pb-8">
+        <div
+          className="inline-flex items-center gap-2 mb-4 px-3 py-1 rounded-full text-[0.6875rem] font-bold uppercase tracking-widest"
+          style={{
+            background: "rgba(41,182,246,0.16)",
+            border: "1px solid rgba(41,182,246,0.38)",
+            color: "#7DD3FC",
+            fontFamily: "'Sora', sans-serif",
+          }}
+        >
+          <span className="w-1.5 h-1.5 rounded-full bg-[#38BDF8]" />
+          Free · No account required
+        </div>
+        <h1
+          className="text-white mb-2"
+          style={{
+            fontFamily: "'Sora', sans-serif",
+            fontWeight: 800,
+            fontSize: "clamp(1.75rem, 4vw, 2.5rem)",
+            lineHeight: 1.15,
+          }}
+        >
+          Creator Scam Detector
+        </h1>
+        <p style={{ color: "#94A3B8", fontSize: "1rem", lineHeight: 1.65 }}>
+          Paste a brand outreach or deal message below. Optional fields add context
+          but are never required.
+        </p>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-8 space-y-8">
-        {/* Form */}
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-          {/* Message */}
-          <div className="space-y-1.5">
-            <Label htmlFor="message" className="font-semibold text-gray-800">
-              Pasted message <span className="text-red-500">*</span>
-            </Label>
-            <Textarea
-              id="message"
-              rows={7}
-              placeholder="Paste the full brand outreach or deal message here…"
-              className="resize-y text-sm"
-              {...register("message")}
-            />
-            {errors.message && (
-              <p className="text-xs text-red-500">{errors.message.message}</p>
-            )}
-          </div>
-
-          {/* Optional fields */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <main className="relative z-10 max-w-3xl mx-auto px-6 pb-16 space-y-6">
+        {/* ── Form card ── */}
+        <div
+          className="rounded-2xl p-6 space-y-5"
+          style={{
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.1)",
+            backdropFilter: "blur(12px)",
+          }}
+        >
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            {/* Message textarea */}
             <div className="space-y-1.5">
-              <Label htmlFor="brandName" className="text-sm text-gray-700">
-                Brand / sender name
-                <span className="ml-1 text-gray-400 font-normal">(optional)</span>
-              </Label>
-              <Input
-                id="brandName"
-                placeholder="e.g. Acme Co."
-                className="text-sm"
-                {...register("brandName")}
+              <label
+                htmlFor="message"
+                className="block text-sm font-bold text-white"
+                style={{ fontFamily: "'Sora', sans-serif" }}
+              >
+                Pasted message <span style={{ color: "#F87171" }}>*</span>
+              </label>
+              <textarea
+                id="message"
+                rows={7}
+                placeholder="Paste the full brand outreach or deal message here…"
+                className="w-full rounded-xl text-sm resize-y transition-all outline-none"
+                style={{
+                  background: "rgba(255,255,255,0.96)",
+                  color: "#0D1B2A",
+                  border: "1px solid rgba(148,163,184,0.24)",
+                  padding: "0.9rem 0.95rem",
+                  fontFamily: "'Inter', sans-serif",
+                  lineHeight: 1.6,
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.borderColor = "#29B6F6";
+                  e.currentTarget.style.boxShadow = "0 0 0 4px rgba(41,182,246,0.16)";
+                }}
+                {...register("message", {
+                  onBlur: (e) => {
+                    e.currentTarget.style.borderColor = "rgba(148,163,184,0.24)";
+                    e.currentTarget.style.boxShadow = "none";
+                  }
+                })}
               />
+              {errors.message && (
+                <p className="text-xs" style={{ color: "#F87171" }}>
+                  {errors.message.message}
+                </p>
+              )}
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="senderEmail" className="text-sm text-gray-700">
-                Sender email / domain
-                <span className="ml-1 text-gray-400 font-normal">(optional)</span>
-              </Label>
-              <Input
-                id="senderEmail"
-                placeholder="e.g. hello@brand.com"
-                className="text-sm"
-                {...register("senderEmail")}
-              />
+            {/* Optional fields */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[
+                { id: "brandName", label: "Brand / sender name", placeholder: "e.g. Acme Co.", key: "brandName" as const },
+                { id: "senderEmail", label: "Sender email / domain", placeholder: "e.g. hello@brand.com", key: "senderEmail" as const },
+                { id: "contactChannel", label: "Contact channel", placeholder: "e.g. Instagram DM", key: "contactChannel" as const },
+              ].map((field) => (
+                <div key={field.id} className="space-y-1.5">
+                  <label
+                    htmlFor={field.id}
+                    className="block text-sm"
+                    style={{ color: "#E2E8F0", fontWeight: 600, fontFamily: "'Sora', sans-serif" }}
+                  >
+                    {field.label}{" "}
+                    <span style={{ color: "#64748B", fontWeight: 400, fontSize: "0.8rem" }}>
+                      (optional)
+                    </span>
+                  </label>
+                  <input
+                    id={field.id}
+                    type="text"
+                    placeholder={field.placeholder}
+                    className="w-full rounded-xl text-sm outline-none transition-all"
+                    style={{
+                      background: "rgba(255,255,255,0.96)",
+                      color: "#0D1B2A",
+                      border: "1px solid rgba(148,163,184,0.24)",
+                      padding: "0.75rem 0.95rem",
+                      fontFamily: "'Inter', sans-serif",
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = "#29B6F6";
+                      e.currentTarget.style.boxShadow = "0 0 0 4px rgba(41,182,246,0.16)";
+                    }}
+                    {...register(field.key, {
+                      onBlur: (e) => {
+                        e.currentTarget.style.borderColor = "rgba(148,163,184,0.24)";
+                        e.currentTarget.style.boxShadow = "none";
+                      }
+                    })}
+                  />
+                </div>
+              ))}
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="contactChannel" className="text-sm text-gray-700">
-                Contact channel
-                <span className="ml-1 text-gray-400 font-normal">(optional)</span>
-              </Label>
-              <Input
-                id="contactChannel"
-                placeholder="e.g. Instagram DM"
-                className="text-sm"
-                {...register("contactChannel")}
-              />
-            </div>
-          </div>
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={checkMutation.isPending}
+              className="inline-flex items-center justify-center gap-2 font-bold text-white rounded-xl transition-all w-full sm:w-auto"
+              style={{
+                fontFamily: "'Sora', sans-serif",
+                fontWeight: 700,
+                fontSize: "0.9375rem",
+                padding: "0.9rem 2rem",
+                background: checkMutation.isPending
+                  ? "rgba(41,182,246,0.4)"
+                  : "linear-gradient(135deg, #29B6F6 0%, #1565C0 100%)",
+                boxShadow: checkMutation.isPending ? "none" : "0 4px 20px rgba(41,182,246,0.38)",
+                border: "none",
+                cursor: checkMutation.isPending ? "not-allowed" : "pointer",
+                borderRadius: "0.625rem",
+                opacity: checkMutation.isPending ? 0.7 : 1,
+              }}
+            >
+              {checkMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Analyzing…
+                </>
+              ) : (
+                "Check this message"
+              )}
+            </button>
+          </form>
+        </div>
 
-          <Button
-            type="submit"
-            disabled={checkMutation.isPending}
-            className="w-full sm:w-auto"
-          >
-            {checkMutation.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Analyzing…
-              </>
-            ) : (
-              "Check this message"
-            )}
-          </Button>
-        </form>
-
-        {/* API error fallback */}
+        {/* API error */}
         {apiError && (
-          <div className="rounded-xl border-2 border-gray-300 bg-white p-5 flex gap-3 items-start shadow-sm">
-            <AlertTriangle className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
+          <div
+            className="rounded-2xl p-5 flex gap-3 items-start"
+            style={{
+              background: "rgba(248,113,113,0.1)",
+              border: "1px solid rgba(248,113,113,0.3)",
+            }}
+          >
+            <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold text-gray-800 text-sm">
+              <p className="font-semibold text-white text-sm" style={{ fontFamily: "'Sora', sans-serif" }}>
                 Unable to complete the check
               </p>
-              <p className="text-sm text-gray-600 mt-0.5">{apiError}</p>
+              <p className="text-sm mt-0.5" style={{ color: "#94A3B8" }}>
+                {apiError}
+              </p>
             </div>
           </div>
         )}
 
-        {/* Result + Brand Lookup prompt */}
+        {/* Result */}
         {result && <ResultCard result={result} />}
       </main>
+
+      {/* Footer */}
+      <footer
+        className="relative z-10 py-6 mt-4"
+        style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}
+      >
+        <p className="text-center text-xs" style={{ color: "#475569" }}>
+          CreatorGrove · AI matching is decision support only · Patent Pending
+        </p>
+      </footer>
     </div>
   );
 }

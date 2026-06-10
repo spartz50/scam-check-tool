@@ -3,6 +3,19 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* CreatorGrove brand fonts */
+:root {
+  --font-sora: 'Sora', sans-serif;
+  --font-inter: 'Inter', sans-serif;
+  --cg-navy: #0D1B2A;
+  --cg-navy-mid: #0f2744;
+  --cg-navy-light: #1a3a6b;
+  --cg-cyan: #29B6F6;
+  --cg-cyan-light: #7DD3FC;
+  --cg-slate: #94A3B8;
+  --cg-slate-dark: #64748B;
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
