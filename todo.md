@@ -17,3 +17,13 @@
 - [x] UI: Brand Lookup unlock prompt below every result with Typeform link
 - [x] UI: "Check a deal" CTA on Home page linking to /scamdetector
 - [x] Vitest: test that log procedure stores only allowed fields
+
+## Redesign — CreatorGrove branding
+
+- [x] Redesign Home page with dark navy hero matching creatorgrove.com/brandratings
+- [x] Add sample result cards (HIGH RISK / CAUTION / LOW RISK SIGNALS) on homepage
+- [x] Add How it Works section and CTA band on homepage
+- [x] Redesign ScamDetector page with CG dark navy theme
+- [x] Add Sora + Inter fonts matching creatorgrove.com
+- [x] Update page title and meta description
+- [x] Push redesign to GitHub and trigger Railway redeploy
