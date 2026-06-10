@@ -8,8 +8,8 @@ RUN npm install -g pnpm
 # Copy package files
 COPY package.json pnpm-lock.yaml ./
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install dependencies (skip patch validation for Railway compatibility)
+RUN pnpm install --no-frozen-lockfile
 
 # Copy source
 COPY . .
