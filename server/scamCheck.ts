@@ -2,12 +2,14 @@
  * scamCheck.ts
  *
  * Server-side tRPC router for the UGC Scam Check tool.
- * Uses Claude Haiku (claude-haiku-4-5) via the Anthropic API directly,
- * keyed from the ANTHROPIC_API_KEY environment variable so credentials
- * can be swapped without touching this file.
+ * Uses Claude Haiku (claude-haiku-4-5) via the Anthropic API directly.
  *
- * Rate limit: RATE_LIMIT_MAX checks per RATE_LIMIT_WINDOW_MS per IP.
- * Stored in-process; resets on server restart (sufficient for this use case).
+ * Abuse protection layers:
+ *   1. Per-IP sliding window: max 5 checks per hour
+ *   2. Global daily cap: max 2000 checks per calendar day (UTC) — cost guard
+ *   3. Bot filter: requests with no User-Agent are rejected
+ *   4. Input validation: min 10 / max 5000 chars on message
+ *   5. Blocked-IP list: IPs that hit the limit 3+ times in a day are soft-blocked for 24h
  *
  * Logging: after each successful check, ONE row is written to scam_check_logs:
  *   - riskLevel  (the outcome enum value)
@@ -30,47 +32,112 @@ const MODEL = "claude-haiku-4-5";
 const MAX_TOKENS = 1024;
 const TEMPERATURE = 0.1;
 
-// Rate limit: 10 checks per 60-second window per IP
-const RATE_LIMIT_MAX = 10;
-const RATE_LIMIT_WINDOW_MS = 60_000;
+// Per-IP rate limit: 5 checks per hour (sliding window)
+const RATE_LIMIT_MAX = 5;
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
 
-// ─── Rate limiter (in-memory, per IP) ─────────────────────────────────────────
+// Soft-block: if an IP hits the rate limit 3+ times in a day, block for 24h
+const ABUSE_THRESHOLD = 3;
+const BLOCK_DURATION_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-type RateLimitEntry = { count: number; windowStart: number };
+// Global daily cap: max 2000 checks per UTC calendar day
+const GLOBAL_DAILY_CAP = 2000;
+
+// ─── In-memory state ──────────────────────────────────────────────────────────
+
+type RateLimitEntry = { count: number; windowStart: number; violations: number; blockedUntil?: number };
 const rateLimitMap = new Map<string, RateLimitEntry>();
+
+// Global daily counter — resets at UTC midnight
+let globalDailyCount = 0;
+let globalDayKey = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+
+function getGlobalDayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function checkGlobalCap(): void {
+  const today = getGlobalDayKey();
+  if (today !== globalDayKey) {
+    // New UTC day — reset counter
+    globalDayKey = today;
+    globalDailyCount = 0;
+  }
+  if (globalDailyCount >= GLOBAL_DAILY_CAP) {
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: "The scam checker has reached its daily usage limit. Please check back tomorrow — it resets at midnight UTC.",
+    });
+  }
+  globalDailyCount += 1;
+}
 
 function checkRateLimit(ip: string): void {
   const now = Date.now();
   const entry = rateLimitMap.get(ip);
 
+  // Check if IP is currently soft-blocked
+  if (entry?.blockedUntil && now < entry.blockedUntil) {
+    const minutesLeft = Math.ceil((entry.blockedUntil - now) / 60_000);
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: `Your IP has been temporarily blocked due to excessive requests. Please try again in ${minutesLeft} minute${minutesLeft === 1 ? "" : "s"}.`,
+    });
+  }
+
   if (!entry || now - entry.windowStart > RATE_LIMIT_WINDOW_MS) {
-    rateLimitMap.set(ip, { count: 1, windowStart: now });
+    // New window
+    rateLimitMap.set(ip, {
+      count: 1,
+      windowStart: now,
+      violations: entry?.violations ?? 0,
+    });
     return;
   }
 
   if (entry.count >= RATE_LIMIT_MAX) {
+    // Increment violation count
+    entry.violations = (entry.violations ?? 0) + 1;
+
+    // Soft-block if abuse threshold reached
+    if (entry.violations >= ABUSE_THRESHOLD) {
+      entry.blockedUntil = now + BLOCK_DURATION_MS;
+      console.warn(`[scamCheck] IP ${ip} soft-blocked for 24h after ${entry.violations} violations`);
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: "Your IP has been temporarily blocked due to excessive requests. Please try again in 24 hours.",
+      });
+    }
+
+    const windowResetMins = Math.ceil((RATE_LIMIT_WINDOW_MS - (now - entry.windowStart)) / 60_000);
     throw new TRPCError({
       code: "TOO_MANY_REQUESTS",
-      message: `Rate limit reached. You can run up to ${RATE_LIMIT_MAX} checks per minute. Please wait a moment and try again.`,
+      message: `You've reached the limit of ${RATE_LIMIT_MAX} checks per hour. Please try again in ${windowResetMins} minute${windowResetMins === 1 ? "" : "s"}.`,
     });
   }
 
   entry.count += 1;
 }
 
+function checkBotFilter(userAgent: string | undefined): void {
+  if (!userAgent || userAgent.trim().length < 5) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "Request rejected.",
+    });
+  }
+}
+
 // ─── Anonymized usage logger ──────────────────────────────────────────────────
-// Writes ONLY the risk_level enum value and the auto-generated timestamp.
-// No user content, no IP, no message text is written.
 
 async function logCheckOutcome(
   riskLevel: "HIGH RISK" | "CAUTION" | "LOW RISK SIGNALS"
 ): Promise<void> {
   try {
     const db = await getDb();
-    if (!db) return; // DB unavailable — log silently, don't fail the request
+    if (!db) return;
     await db.insert(scamCheckLogs).values({ riskLevel });
   } catch (err) {
-    // Logging failure must never surface to the user
     console.error("[scamCheck] Failed to write usage log:", err);
   }
 }
@@ -174,9 +241,6 @@ async function callHaiku(userMessage: string): Promise<ScamCheckResult> {
 
   const rawText = data?.content?.find(b => b.type === "text")?.text ?? "";
 
-  // Extract the JSON object robustly:
-  // 1. Strip any markdown code fences
-  // 2. Pull out the first {...} block so trailing prose is ignored
   const fenceStripped = rawText
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```[\s\S]*$/, "")
@@ -196,7 +260,6 @@ async function callHaiku(userMessage: string): Promise<ScamCheckResult> {
     });
   }
 
-  // Validate the shape minimally
   if (
     !["HIGH RISK", "CAUTION", "LOW RISK SIGNALS"].includes(parsed.risk_level) ||
     typeof parsed.risk_score !== "number" ||
@@ -216,7 +279,10 @@ async function callHaiku(userMessage: string): Promise<ScamCheckResult> {
 // ─── Input schema ─────────────────────────────────────────────────────────────
 
 const scamCheckInput = z.object({
-  message: z.string().min(10, "Please paste a message of at least 10 characters.").max(8000, "Message is too long (max 8000 characters)."),
+  message: z
+    .string()
+    .min(10, "Please paste a message of at least 10 characters.")
+    .max(5000, "Message is too long (max 5000 characters)."),
   brandName: z.string().max(200).optional(),
   senderEmail: z.string().max(200).optional(),
   contactChannel: z.string().max(100).optional(),
@@ -228,6 +294,10 @@ export const scamCheckRouter = router({
   check: publicProcedure
     .input(scamCheckInput)
     .mutation(async ({ input, ctx }) => {
+      // Bot filter — reject requests with no/empty User-Agent
+      const userAgent = ctx.req.headers["user-agent"];
+      checkBotFilter(userAgent);
+
       // Derive IP from forwarded headers or socket
       const ip =
         (ctx.req.headers["x-forwarded-for"] as string | undefined)
@@ -236,11 +306,14 @@ export const scamCheckRouter = router({
         ctx.req.socket?.remoteAddress ??
         "unknown";
 
+      // Check global daily cap first (cheapest check)
+      checkGlobalCap();
+
+      // Then per-IP rate limit
       checkRateLimit(ip);
 
       // Build the user message for the model.
-      // NOTE: this string is sent to the Anthropic API only — it is never
-      // written to the database or to any persistent log.
+      // NOTE: this string is sent to the Anthropic API only — never persisted.
       const parts: string[] = [`MESSAGE:\n${input.message}`];
       if (input.brandName?.trim()) parts.push(`BRAND/SENDER NAME: ${input.brandName.trim()}`);
       if (input.senderEmail?.trim()) parts.push(`SENDER EMAIL/DOMAIN: ${input.senderEmail.trim()}`);
@@ -251,7 +324,6 @@ export const scamCheckRouter = router({
       const result = await callHaiku(userMessage);
 
       // Log ONLY the outcome — no user content is persisted.
-      // Fire-and-forget: logging failure never blocks the response.
       void logCheckOutcome(result.risk_level);
 
       return result;

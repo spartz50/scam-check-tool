@@ -27,3 +27,14 @@
 - [x] Add Sora + Inter fonts matching creatorgrove.com
 - [x] Update page title and meta description
 - [x] Push redesign to GitHub and trigger Railway redeploy
+
+## Abuse Protection & Rate Limiting
+
+- [ ] Tighten IP rate limit: max 5 checks per IP per hour (sliding window)
+- [ ] Add global daily cap: max 2000 checks/day across all users (cost guard)
+- [ ] Block requests with missing/empty User-Agent (bot filter)
+- [ ] Add minimum message length check (10 chars) to prevent trivial spam
+- [ ] Add maximum message length cap (5000 chars) to prevent oversized payloads
+- [ ] Return clear 429 error messages with retry-after info
+- [ ] Log blocked attempts to DB for monitoring
+- [ ] Deploy and verify on Railway
